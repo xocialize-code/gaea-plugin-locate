@@ -3,7 +3,7 @@
 Where something is in a picture, as boxes: MES Image 0.1's `image.locate` as a
 [Gaea](https://github.com/xocialize-code/gaea) plugin. It runs **Qwen3-VL-4B-Instruct** (Apache-2.0), is built on
 [GaeaPluginKit](https://github.com/xocialize-code/gaea-plugin-kit) over
-[mlx-locate-swift](https://github.com/xocialize/mlx-locate-swift) 0.1.0, runs in its own process, and speaks the Gaea
+[mlx-locate-swift](https://github.com/xocialize/mlx-locate-swift) 0.2.0, runs in its own process, and speaks the Gaea
 Plugin Protocol v1. It needs Gaea 1.9.0. Add it to Gaea by its repo URL:
 
 ```bash
