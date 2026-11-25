@@ -6,7 +6,7 @@ import MLXServeCore
 import MLXToolKit
 
 // The in-process reference for the plugin: one lane of Qwen3-VL locate loaded by MLXServeEngine in this process, with
-// the lane configuration the worker uses (LocatePlugin) and the request it builds (`request`, `boxes(in:)`). It prints
+// the lane configuration the worker uses (LocatePlugin) and the typed request it builds (`request`, `boxes(in:)`). It prints
 // one JSON line: the boxes as the worker would return them, and the timings. Not part of the plugin bundle.
 //
 //   locate-inproc --image <png | jpeg> --prompt <text> [--count 1] [--lane int8 | int4] [--models-root <dir>]
@@ -48,18 +48,18 @@ let id = PackageID(modelID)
 _ = try await engine.register(LocatePackage.registration, configuration: configuration, id: id)
 
 var clock = ContinuousClock.now
-_ = try await engine.prepare(.imageAnalysis, package: id)
+_ = try await engine.prepare(.imageLocate, package: id)
 var result: [String: Any] = ["model": modelID, "lane": quant.rawValue, "count": count, "prepare_s": seconds(since: clock)]
 
 let image = Image(format: imagePath.lowercased().hasSuffix(".png") ? .png : .jpeg, data: try Data(contentsOf: URL(fileURLWithPath: imagePath)))
 var found: [JSONValue] = []
 for run in 1...max(1, runs) {
     clock = ContinuousClock.now
-    guard let response = try await engine.run(request(image: image, prompt: prompt, count: count), package: id) as? ImageAnalysisResponse else {
+    guard let response = try await engine.run(request(image: image, prompt: prompt, count: count), package: id) as? ImageLocateResponse else {
         fail("the model returned no answer")
     }
     result["run\(run)_s"] = seconds(since: clock)
-    if run == 1 { found = try boxes(in: response.text) }
+    if run == 1 { found = boxes(in: response) }
 }
 let boxesData = try JSONEncoder().encode(found)
 result["boxes"] = try JSONSerialization.jsonObject(with: boxesData)

@@ -28,25 +28,27 @@ import Testing
         #expect(throws: GPPError.self) { try Ask(job([:], prompt: nil)) }
     }
 
-    @Test func theRequestIsThePackagesLocateModeWithTheCount() throws {
+    @Test func theRequestIsTheTypedLocateRequestWithTheCount() throws {
         let request = request(image: Image(format: .png, data: Data()), prompt: "the fox", count: 3)
-        #expect(request.mode == .locate && request.prompt == "the fox")
-        if case .int(let n)? = request.metaData["count"] { #expect(n == 3) } else { Issue.record("count isn't an int") }
+        #expect(request.prompt == "the fox" && request.count == 3 && request.seed == nil && request.mode == nil)
+        #expect(type(of: request).capability == .imageLocate)
     }
 
     @Test func theAnswersBoxesBecomeTheOutputValue() throws {
-        let text = #"{"boxes":[{"x":0.25,"y":0.5,"width":0.125,"height":0.25,"label":"the fox","score":0.5}]}"#
-        let boxes = try boxes(in: text)
-        #expect(boxes.count == 1)
+        let boxes = boxes(in: ImageLocateResponse(boxes: [
+            ImageLocateBox(x: 0.25, y: 0.5, width: 0.125, height: 0.25, label: "the fox", score: 0.5),
+            ImageLocateBox(x: 0, y: 0, width: 1, height: 1),
+        ]))
+        #expect(boxes.count == 2)
         #expect(boxes[0]["x"]?.doubleValue == 0.25 && boxes[0]["height"]?.doubleValue == 0.25)
         #expect(boxes[0]["label"]?.stringValue == "the fox" && boxes[0]["score"]?.doubleValue == 0.5)
-        #expect(try LocatePlugin.boxes(in: #"{"boxes":[]}"#).isEmpty, "nothing found is an empty list, not an error")
-        #expect(throws: GPPError.self) { try LocatePlugin.boxes(in: "I can't find it.") }
+        #expect(boxes[1]["label"] == nil && boxes[1]["score"] == nil, "no label or score is none, never an invented one")
+        #expect(LocatePlugin.boxes(in: ImageLocateResponse(boxes: [])).isEmpty, "nothing found is an empty list, not an error")
     }
 
     @Test func theManifestOffersOneModelOnImageLocateWithTwoLanes() throws {
         let manifest = try locatePlugin.manifest()
-        #expect(manifest.version == "0.1.0" && manifest.minGaea == "1.9.0")
+        #expect(manifest.version == "0.2.0" && manifest.minGaea == "1.10.0")
         #expect(manifest.models.map(\.id) == ["qwen3-vl-locate"])
         #expect(manifest.models[0].lanes.map(\.id) == ["int8", "int4"] && manifest.models[0].lanes[0].default)
         #expect(manifest.models[0].lanes.map { $0.resolved.weightSources.map(\.repo) }
@@ -56,5 +58,7 @@ import Testing
         #expect(model["license"]?["spdx"] == "Apache-2.0" && model["named_only"] == nil)
         #expect(model["limits"]?["max_count"] == 16 && model["supports"]?["seed"] == false)
         #expect(manifest.engine?.contract == MLXEngineRelease.contract)
+        // The typed surface is declared, with the list's cap: Gaea needs an engine of contract 1.66.0 or later to read it.
+        #expect(manifest.models[0].package.surfaces.contains { $0.capability == .imageLocate })
     }
 }

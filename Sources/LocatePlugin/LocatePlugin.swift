@@ -10,10 +10,11 @@ import MLXToolKit
 // One model, `qwen3-vl-locate`: a picture and a prompt in, boxes out, one box per instance the model finds, each with
 // the prompt as its label and a score. Two lanes, the package's artifacts: int8 (the default) and int4.
 //
-// The engine contract has no capability that carries boxes yet (asked of mlx-engine, AB-A-0295), so the package serves
-// `imageAnalysis` in its `locate` mode and answers with the boxes as JSON text. The worker decodes that text and
-// returns the list as the `boxes` output's value. Gaea sends the picture upright, and MESKit keeps each box inside the
-// picture, sorts by score and cuts the list to `count`.
+// From 0.2.0 the boxes travel typed: the engine's `imageLocate` capability (contract 1.66.0, AB-A-0295), which
+// mlx-locate-swift 0.3.0 serves. The worker sends `ImageLocateRequest` with the job's `count` and returns the answer's
+// boxes as the `boxes` output's value. The package asks the model for every instance and answers with the best `count`
+// by score, each box inside the picture. Gaea sends the picture upright, and MESKit clips, sorts and cuts the list
+// again, which changes nothing in a list that already is. 0.1.x sent `imageAnalysis` and decoded JSON text.
 
 public let modelID = "qwen3-vl-locate"
 public let operation = "image.locate"
@@ -31,19 +32,18 @@ public func configuration(quant: Quant) -> LocateConfiguration? {
 }
 
 /// The engine request for one job. The worker and locate-inproc both build it here, so the two send the same request.
-public func request(image: Image, prompt: String, count: Int) -> ImageAnalysisRequest {
-    ImageAnalysisRequest(image: image, prompt: prompt, mode: .locate, metaData: ["count": .int(count)])
+public func request(image: Image, prompt: String, count: Int) -> ImageLocateRequest {
+    ImageLocateRequest(image: image, prompt: prompt, count: count)
 }
 
-/// The boxes in the package's answer (`{"boxes": [{x, y, width, height, label, score}]}`), as the `boxes` output's
-/// value: the list itself, each number a share of the upright picture.
-public func boxes(in text: String) throws -> [JSONValue] {
-    guard let answer = try? JSONDecoder().decode(LocateAnswer.self, from: Data(text.utf8)) else {
-        throw GPPError(.internal, "The model's answer wasn't a list of boxes: \(text.prefix(200))")
-    }
-    return answer.boxes.map { box in
-        ["x": .double(box.x), "y": .double(box.y), "width": .double(box.width), "height": .double(box.height),
-         "label": .string(box.label), "score": .double(box.score)]
+/// The answer's boxes as the `boxes` output's value: the list itself, each number a share of the upright picture. The
+/// package gives every box a label and a score; a box without one carries none, never an invented value.
+public func boxes(in response: ImageLocateResponse) -> [JSONValue] {
+    response.boxes.map { box in
+        var value: [String: JSONValue] = ["x": .double(box.x), "y": .double(box.y), "width": .double(box.width), "height": .double(box.height)]
+        if let label = box.label { value["label"] = .string(label) }
+        if let score = box.score { value["score"] = .double(score) }
+        return .object(value)
     }
 }
 
@@ -64,12 +64,12 @@ struct Ask {
     }
 }
 
-/// MES image.locate: one engine call, its answer decoded into the `boxes` value.
+/// MES image.locate: one engine call, its boxes as the `boxes` value.
 let locate = EngineOperation(operation) { job, session in
     let ask = try Ask(job)
     let response = try await session.run(request(image: try job.image("image"), prompt: ask.prompt, count: ask.count))
-    guard let answer = response as? ImageAnalysisResponse else { throw GPPError(.internal, "The model returned no answer.") }
-    return RunResult(outputs: [.value("boxes", .array(try boxes(in: answer.text)))], effective: ["count": .int(Int64(ask.count))])
+    guard let answer = response as? ImageLocateResponse else { throw GPPError(.internal, "The model returned no answer.") }
+    return RunResult(outputs: [.value("boxes", .array(boxes(in: answer)))], effective: ["count": .int(Int64(ask.count))])
 }
 
 public func lanes() -> [LaneDefinition] {
@@ -90,8 +90,8 @@ let offerModel: JSONValue = [
 
 public let locatePlugin = GaeaPluginDefinition(
     id: "com.xocialize.gaea.locate",
-    version: "0.1.1",
-    minGaea: "1.9.0",
+    version: "0.2.0",
+    minGaea: "1.10.0",
     team: "CFZS6RXUCP",
     repo: "https://github.com/xocialize-code/gaea-plugin-locate",
     title: "Locate",

@@ -17,7 +17,7 @@ let package = Package(
     dependencies: [
         kitPath.map { .package(path: $0) }
             ?? .package(url: "https://github.com/xocialize-code/gaea-plugin-kit.git", from: "0.15.0"),
-        .package(url: "https://github.com/xocialize/mlx-locate-swift.git", exact: "0.2.0"),
+        .package(url: "https://github.com/xocialize/mlx-locate-swift.git", exact: "0.3.0"),
         // mlx-engine-swift 0.82.1, the first on the fleet's mlx-swift 0.33.1 (contract 1.66.0, which only adds imageLocate
         // to the 1.65.0 Gaea 1.9 decodes). Pinned exactly: a later 0.x could add fields to the worker's memory report
         // that GPP v1's closed schema doesn't carry, or a contract Gaea can't decode.

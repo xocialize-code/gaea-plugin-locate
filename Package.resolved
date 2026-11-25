@@ -1,5 +1,5 @@
 {
-  "originHash" : "3a66e5318cc85b341654e12c5b1c2d64ab1ede9590a80e0888e7dd9b3fdcdccc",
+  "originHash" : "2dfc998e5d3d1e67662a561a3c569a9d0b8ff7e04ff6c27224afd892ac2c0693",
   "pins" : [
     {
       "identity" : "designscaffold",
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-locate-swift.git",
       "state" : {
-        "revision" : "fa6b44fb7d8a094b7e4ef87003fa763533f78120",
-        "version" : "0.2.0"
+        "revision" : "e60354f346020e5b426e74b06668e2da305fe8a3",
+        "version" : "0.3.0"
       }
     },
     {

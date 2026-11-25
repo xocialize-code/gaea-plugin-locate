@@ -3,8 +3,8 @@
 Where something is in a picture, as boxes: MES Image 0.1's `image.locate` as a
 [Gaea](https://github.com/xocialize-code/gaea) plugin. It runs **Qwen3-VL-4B-Instruct** (Apache-2.0), is built on
 [GaeaPluginKit](https://github.com/xocialize-code/gaea-plugin-kit) over
-[mlx-locate-swift](https://github.com/xocialize/mlx-locate-swift) 0.2.0, runs in its own process, and speaks the Gaea
-Plugin Protocol v1. It needs Gaea 1.9.0. Add it to Gaea by its repo URL:
+[mlx-locate-swift](https://github.com/xocialize/mlx-locate-swift) 0.3.0, runs in its own process, and speaks the Gaea
+Plugin Protocol v1. It needs Gaea 1.10.0 (0.1.x runs on Gaea 1.9.0). Add it to Gaea by its repo URL:
 
 ```bash
 gaea plugins add https://github.com/xocialize-code/gaea-plugin-locate
@@ -54,8 +54,8 @@ different head crop changes HairDeck's hair less than another seed does (AB-R-08
 
 | Lane | Artifact | Resident | Peak while running | Gaea schedules |
 |---|---|---|---|---|
-| `int8` (default) | `mlx-community/Qwen3-VL-4B-Instruct-8bit` | 5.4 GB | 2.6 GB | 8.0 GB |
-| `int4` | `mlx-community/Qwen3-VL-4B-Instruct-4bit` | 3.35 GB | 2.6 GB | 5.95 GB |
+| `int8` (default) | `mlx-community/Qwen3-VL-4B-Instruct-8bit` | 5.4 GB | 3.0 GB | 8.4 GB |
+| `int4` | `mlx-community/Qwen3-VL-4B-Instruct-4bit` | 3.35 GB | 3.0 GB | 6.35 GB |
 
 The figures are the package's declared footprints. When `int8` doesn't fit, Gaea loads `int4` and warns
 (`lane_fallback`); `gaea models lane qwen3-vl-locate int4` makes it the default. A request naming a lane
@@ -68,10 +68,16 @@ there and downloads a missing snapshot on `prepare`. `gaea plugins warm com.xoci
 
 ## How the boxes travel
 
-The engine contract has no capability that carries boxes yet (asked of mlx-engine, AB-A-0295). The package serves
-`imageAnalysis` in its `locate` mode and answers with the boxes as JSON text; the worker decodes that and returns the
-list as the `boxes` output's value (GPP-1 §3.3.5). MESKit, in Gaea, keeps each box inside the picture, sorts by score
-and cuts the list to `count`.
+From 0.2.0 the boxes travel typed, on the engine's `imageLocate` capability (contract 1.66.0, AB-A-0295): the worker
+sends `ImageLocateRequest` with the job's `count` and returns the answer's boxes as the `boxes` output's value (GPP-1
+§3.3.5). The package asks the model for every instance and answers with the best `count` by score, each box inside
+the picture. MESKit, in Gaea, clips, sorts and cuts the list again, which changes nothing in a list that already is.
+
+What differs from 0.1.x, which sent `imageAnalysis` and decoded JSON text:
+- With more instances in the picture than `count`, 0.1.x returned the model's first `count`; 0.2.0 returns the best
+  `count` by score. A one-box answer is the same box.
+- A list of many boxes takes longer to write: about 5 s (`int4`) to 8 s (`int8`) for 16. One box is as fast as before.
+- A Gaea older than 1.10.0 can't read this manifest and says which Gaea it needs.
 
 ## Build and check locally
 
